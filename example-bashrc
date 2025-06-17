@@ -8,6 +8,6 @@ export VIMINIT="source ${mylocation}/.vimrc"
 # Load my screenrc file
 export SCREENRC="${mylocation}/.screenrc"
 
-echo "Welcome to ssh toolbox"
+echo "Using sshc toolbox dotfiles"
 
 ## Custom stuff goes here

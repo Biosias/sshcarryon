@@ -5,44 +5,69 @@ die() {
         exit 1
 }       
 
-scriptlocation="$( realpath ${0} | sed -E 's:[^\/]*$::g' )"
-# Point it to directory with your tools you want to take with you
-toolboxlocation="${scriptlocation}/toolbox"
-
-sshoptions='-o ControlPath=~/.ssh/cm-%r@%h:%p -o ControlMaster=auto -o ControlPersist=2m'
-sshcommand="ssh ${1} ${sshoptions}"
-workdir=".sshcarryon"
-
-if [[ "${1}" == *"@"* ]]; then
-
+setup_sshc_connection() {
+	
 	# Check if other connection to this host already exists
 	[[ -n $(ps aux | grep -e "ssh.*${1}.*${workdir}" | grep -v grep) ]] && M_CONNECTION=1 
 
-	${sshcommand} "exit" || die "Unable to connect"
+	${ssh_command} "exit" || die "Unable to connect"
 	
 	# Do following only if there is no sshc connection already openned
 	if [[ -z $M_CONNECTION ]]; then
 		# Create directory on remote machine where all tools will be copied
-		${sshcommand} "mkdir -p ${workdir}/bin -m 700"
-	
-		${sshcommand} "chmod 700 -R ${workdir}/bin"
-
-		scp -r ${sshoptions} ${toolboxlocation}/. ${1}:${workdir}/ &>/dev/null
-	
-		scp ${sshoptions} $(realpath ${0}) ${1}:${workdir}/bin/ &>/dev/null
+		${ssh_command} "mkdir -p ${workdir}/bin -m 700"
+		
+		# Copy all from toolbox directory
+		scp -r ${sshoptions} ${toolbox_location}/. ${ssh_remote_host}:${workdir}/ &>/dev/null
+		
+		# Copy sshc to the remote machine so it can be used from it as well
+		scp ${sshoptions} ${script_location} ${ssh_remote_host}:${workdir}/bin/ &>/dev/null
+		
+		# Make all binaries in bin executable
+		${ssh_command} "chmod 700 -R ${workdir}/bin"
 	fi
 
-	${sshcommand} -t "bash --rcfile ${workdir}/.bashrc" || die "Unable to open shell"
+}
+
+initiate_sshc_connection() {
 	
+	# Initiate sshc connection while sourcing rc file uploaded by sshc
+	${ssh_command} -t "bash --rcfile ${workdir}/.bashrc" || die "Unable to open shell"
+
+}
+
+end_sshc_connection() {
+
 	# Check again if this is the only connection remaining
-	[[ -z $(ps aux | grep -e "ssh.*${1}.*${workdir}" | grep -v grep) ]] && unset $M_CONNECTION
+	[[ -z $(ps aux | grep -e "ssh.*${ssh_remote_host}.*${workdir}" | grep -v grep) ]] && unset $M_CONNECTION
 
 	# Do following only if there is no sshc connection already openned
 	if [[ -z $M_CONNECTION ]]; then
 		# Clean the working directory when last sshc connection ends
-		${sshcommand} "rm -rf ${workdir}"
+		${ssh_command} "rm -rf ${workdir}"
 	fi
 
+}
+
+script_location="$(realpath ${0})"
+
+# Point it to directory with your tools you want to take with you
+toolbox_location="$(echo ${script_location} | sed -E 's:[^\/]*$::g')/toolbox"
+
+# Use ssh multiplexing to allow multiple ssh instaces through single connection
+ssh_remote_host="${1}"
+ssh_options='-o ControlPath=~/.ssh/cm-%r@%h:%p -o ControlMaster=auto -o ControlPersist=2m'
+ssh_command="ssh ${ssh_remote_host} ${ssh_options}"
+workdir=".sshcarryon"
+
+if [[ "${1}" == *"@"* ]]; then
+
+	setup_sshc_connection
+
+	initiate_sshc_connection
+
+	end_sshc_connection
+	
 else
 
 	die "Argument needs to be valid ssh target"
