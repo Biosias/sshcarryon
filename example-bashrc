@@ -1,7 +1,5 @@
 mylocation="${HOME}/.sshcarryon"
 
-chmod 700 -R ${mylocation}/bin
-
 PATH="$PATH:${mylocation}/bin"
 
 # Load my vimrc file

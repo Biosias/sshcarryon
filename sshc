@@ -19,18 +19,30 @@ if [[ "${1}" == *"@"* ]]; then
 	[[ -n $(ps aux | grep -e "ssh.*${1}.*${workdir}" | grep -v grep) ]] && M_CONNECTION=1 
 
 	${sshcommand} "exit" || die "Unable to connect"
+	
+	# Do following only if there is no sshc connection already openned
+	if [[ -z $M_CONNECTION ]]; then
+		# Create directory on remote machine where all tools will be copied
+		${sshcommand} "mkdir -p ${workdir}/bin -m 700"
+	
+		${sshcommand} "chmod 700 -R ${workdir}/bin"
 
-	[[ -z $M_CONNECTION ]] && ${sshcommand} "mkdir ${workdir} -m 700"
-
-	[[ -z $M_CONNECTION ]] && scp -r ${sshoptions} ${toolboxlocation}/. ${1}:${workdir}/ &>/dev/null
-	[[ -z $M_CONNECTION ]] && scp ${sshoptions} $(realpath ${0}) ${1}:${workdir}/bin/ &>/dev/null
+		scp -r ${sshoptions} ${toolboxlocation}/. ${1}:${workdir}/ &>/dev/null
+	
+		scp ${sshoptions} $(realpath ${0}) ${1}:${workdir}/bin/ &>/dev/null
+	fi
 
 	${sshcommand} -t "bash --rcfile ${workdir}/.bashrc" || die "Unable to open shell"
 	
 	# Check again if this is the only connection remaining
 	[[ -z $(ps aux | grep -e "ssh.*${1}.*${workdir}" | grep -v grep) ]] && unset $M_CONNECTION
 
-	[[ -z $M_CONNECTION ]] && ${sshcommand} "rm -rf ${workdir}"
+	# Do following only if there is no sshc connection already openned
+	if [[ -z $M_CONNECTION ]]; then
+		# Clean the working directory when last sshc connection ends
+		${sshcommand} "rm -rf ${workdir}"
+	fi
+
 else
 
 	die "Argument needs to be valid ssh target"
