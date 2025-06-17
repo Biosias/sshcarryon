@@ -7,25 +7,19 @@ die() {
 
 setup_sshc_connection() {
 	
-	# Check if other connection to this host already exists
-	[[ -n $(ps aux | grep -e "ssh.*${1}.*${workdir}" | grep -v grep) ]] && M_CONNECTION=1 
-
 	${ssh_command} "exit" || die "Unable to connect"
 	
-	# Do following only if there is no sshc connection already openned
-	if [[ -z $M_CONNECTION ]]; then
-		# Create directory on remote machine where all tools will be copied
-		${ssh_command} "mkdir -p ${workdir}/bin -m 700"
+	# Create directory on remote machine where all tools will be copied
+	${ssh_command} "mkdir -p ${workdir}/bin -m 700"
 		
-		# Copy all from toolbox directory
-		scp -r ${sshoptions} ${toolbox_location}/. ${ssh_remote_host}:${workdir}/ &>/dev/null
+	# Copy all from toolbox directory
+	scp -r ${sshoptions} ${toolbox_location}/. ${ssh_remote_host}:${workdir}/ &>/dev/null
 		
-		# Copy sshc to the remote machine so it can be used from it as well
-		scp ${sshoptions} ${script_location} ${ssh_remote_host}:${workdir}/bin/ &>/dev/null
+	# Copy sshc to the remote machine so it can be used from it as well
+	scp ${sshoptions} ${script_location} ${ssh_remote_host}:${workdir}/bin/ &>/dev/null
 		
-		# Make all binaries in bin executable
-		${ssh_command} "chmod 700 -R ${workdir}/bin"
-	fi
+	# Make all binaries in bin executable
+	${ssh_command} "chmod 700 -R ${workdir}/bin"
 
 }
 
@@ -38,14 +32,8 @@ initiate_sshc_connection() {
 
 end_sshc_connection() {
 
-	# Check again if this is the only connection remaining
-	[[ -z $(ps aux | grep -e "ssh.*${ssh_remote_host}.*${workdir}" | grep -v grep) ]] && unset $M_CONNECTION
-
-	# Do following only if there is no sshc connection already openned
-	if [[ -z $M_CONNECTION ]]; then
-		# Clean the working directory when last sshc connection ends
-		${ssh_command} "rm -rf ${workdir}"
-	fi
+	# Clean the working directory when last sshc connection ends
+	${ssh_command} "rm -rf ${workdir}"
 
 }
 
@@ -62,11 +50,11 @@ workdir=".sshcarryon"
 
 if [[ "${1}" == *"@"* ]]; then
 
-	setup_sshc_connection
+	[[ -n $(ps aux | grep -e "ssh.*${1}.*${workdir}" | grep -v grep) ]] || setup_sshc_connection
 
 	initiate_sshc_connection
 
-	end_sshc_connection
+	[[ -n $(ps aux | grep -e "ssh.*${1}.*${workdir}" | grep -v grep) ]] && end_sshc_connection
 	
 else
 
