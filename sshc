@@ -1,0 +1,38 @@
+#!/bin/bash
+
+die() { 
+        echo -e " ${NOCOLOR-\e[1;31m*\e[0m }${*}" >&2
+        exit 1
+}       
+
+scriptlocation="$( realpath ${0} | sed -E 's:[^\/]*$::g' )"
+# Point it to directory with your tools you want to take with you
+toolboxlocation="${scriptlocation}/toolbox"
+
+sshoptions='-o ControlPath=~/.ssh/cm-%r@%h:%p -o ControlMaster=auto -o ControlPersist=2m'
+sshcommand="ssh ${1} ${sshoptions}"
+workdir=".sshcarryon"
+
+if [[ "${1}" == *"@"* ]]; then
+
+	# Check if other connection to this host already exists
+	[[ -n $(ps aux | grep -e "ssh.*${1}.*${workdir}" | grep -v grep) ]] && M_CONNECTION=1 
+
+	${sshcommand} "exit" || die "Unable to connect"
+
+	[[ -z $M_CONNECTION ]] && ${sshcommand} "mkdir ${workdir} -m 700"
+
+	[[ -z $M_CONNECTION ]] && scp -r ${sshoptions} ${toolboxlocation}/. ${1}:${workdir}/ &>/dev/null
+	[[ -z $M_CONNECTION ]] && scp ${sshoptions} $(realpath ${0}) ${1}:${workdir}/bin/ &>/dev/null
+
+	${sshcommand} -t "bash --rcfile ${workdir}/.bashrc" || die "Unable to open shell"
+	
+	# Check again if this is the only connection remaining
+	[[ -z $(ps aux | grep -e "ssh.*${1}.*${workdir}" | grep -v grep) ]] && unset $M_CONNECTION
+
+	[[ -z $M_CONNECTION ]] && ${sshcommand} "rm -rf ${workdir}"
+else
+
+	die "Argument needs to be valid ssh target"
+
+fi
